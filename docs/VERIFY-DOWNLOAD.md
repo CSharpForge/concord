@@ -35,9 +35,24 @@ gh attestation verify .\SHA256SUMS.txt --repo CSharpForge/concord `
   --signer-workflow CSharpForge/concord/.github/workflows/release.yml
 ```
 
-`Verification succeeded` means GitHub holds a signed statement, made with a short-lived
-[Sigstore](https://www.sigstore.dev/) certificate, that exactly these bytes were produced by that workflow in
-this repository. The output names the commit it was built from, and you can read that commit's source.
+Success means GitHub holds a signed statement, made with a short-lived [Sigstore](https://www.sigstore.dev/)
+certificate, that exactly these bytes were produced by that workflow in this repository. When `gh` is not
+attached to a terminal it prints nothing on success, so check the exit code (`$LASTEXITCODE` should be `0`) or
+add `--format json` to see the details:
+
+```powershell
+gh attestation verify .\Concord_0.1.0_x64-setup.exe --repo CSharpForge/concord --format json
+```
+
+Look at these fields in the result:
+
+- `sourceRepositoryDigest`: the exact commit the file was built from. You can read that commit's source.
+- `sourceRepositoryRef`: for a real release this is the version tag, for example `refs/tags/v0.1.0`.
+- `githubWorkflowName` is `Release`, `githubWorkflowTrigger` is `push` for a release, and `runnerEnvironment`
+  is `github-hosted`.
+
+(A build started by hand from the Actions tab is a dry run: its ref is a branch and its trigger is
+`workflow_dispatch`. Those files are not releases.)
 
 ## What this does and does not prove
 
