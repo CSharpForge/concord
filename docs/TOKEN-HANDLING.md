@@ -49,6 +49,17 @@ your server and channel names, and job counters. The window is also granted **no
 makes no network requests of its own except loading server icons from Discord's image CDN
 (`cdn.discordapp.com`; images only, no token).
 
+## The window's Content Security Policy
+
+The app window runs under a strict Content Security Policy ([`tauri.conf.json`](../src-tauri/tauri.conf.json)):
+only Concord's own scripts and styles run (no remote scripts, no `eval`, no inline code except two exactly
+hashed items from the framework), images may come only from `cdn.discordapp.com`, and the page may talk only
+to Tauri's internal channel to the Rust backend, never to a web host. Even if something tried to inject code
+into the window, the policy would stop it loading scripts or sending data out. Tests fail the build if the
+policy is weakened. Checked so far: the policy is enforced in a browser; and a real Tauri build (on Linux)
+starts and runs the app under it with no violations. The Windows WebView2 window has not been confirmed by
+a person yet.
+
 ## What is stored on disk
 
 | What | Where | Contains the token? |
@@ -72,8 +83,8 @@ separate Microsoft product with its own behaviour that Concord does not control.
 These run on every push, on Windows, in [CI](../.github/workflows/ci.yml):
 
 - [`src-tauri/tests/trust.rs`](../src-tauri/tests/trust.rs): the app's Rust code contains no web address except
-  `https://discord.com`; contains no logging or printing; no command deals in tokens; and the window is granted
-  only `core:default`.
+  `https://discord.com`; contains no logging or printing; no command deals in tokens; the window is granted
+  only `core:default`; and the Content Security Policy stays strict.
 - [`src/lib/trust.test.ts`](../src/lib/trust.test.ts): the UI references only `cdn.discordapp.com`, never calls
   `fetch` or opens a socket itself, uses no Tauri plugin APIs, and never touches `localStorage` or cookies.
 
@@ -81,14 +92,13 @@ These run on every push, on Windows, in [CI](../.github/workflows/ci.yml):
 
 - **The token is not wiped from memory.** While Concord runs, the token sits in ordinary process memory.
   Anything that can read the process (running as your Windows user, or a debugger) could read it.
-- **No Content Security Policy is set yet** on the app window. It is planned. Concord's window only shows
-  Concord's own pages, but a CSP would add a second layer.
 - **The sign-in window shares the app's WebView2 profile.** Concord clears it after a *successful* sign-in. If
   you close the window mid-way, Discord's cookies can stay in that profile until the next sign-in or until you
   delete the app's data.
 - **Anyone who can run code as you can use the token.** Credential Manager protects the token from other
   Windows users, not from programs running as you.
-- **No installer or code signing yet.** Today you build from source. Check what you run.
+- **Installers are not code-signed yet.** Windows shows an "unknown publisher" warning. Releases come with a
+  checksum and a signed provenance attestation instead: [VERIFY-DOWNLOAD.md](VERIFY-DOWNLOAD.md).
 - **Windows behaviour is only partly verified.** CI builds and tests on Windows, but the tray icon, start at
   login, and the sign-in capture inside WebView2 have not been confirmed by a person yet.
 

@@ -6,6 +6,8 @@
 //! checked on a development machine. Everything here uses the official Tauri
 //! tray API and the official `autostart` / `single-instance` plugins.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -20,9 +22,24 @@ const TRAY_ID: &str = "concord-tray";
 /// Tray, hide-on-close and start-at-login exist on Windows only.
 pub const BACKGROUND_SUPPORTED: bool = cfg!(windows);
 
+/// Set once the tray icon exists. Hiding the window is only safe then: with no tray
+/// icon there would be no way to bring a hidden window back.
+static TRAY_READY: AtomicBool = AtomicBool::new(false);
+
 /// Did the OS (or the user) ask for a minimized start? `args[0]` is the program.
 pub fn should_start_hidden(args: &[String]) -> bool {
     args.iter().skip(1).any(|a| a == START_MINIMIZED_ARG)
+}
+
+/// Start with the window hidden? Only if asked to AND the tray icon exists to reopen it.
+pub fn start_hidden(args: &[String], tray_ready: bool) -> bool {
+    tray_ready && should_start_hidden(args)
+}
+
+/// Hide (instead of quit) when the main window is closed? Only where supported AND
+/// the tray icon exists to reopen it.
+pub fn should_hide_on_close(supported: bool, tray_ready: bool) -> bool {
+    supported && tray_ready
 }
 
 /// What a tray menu entry does.
@@ -92,11 +109,14 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
 
 /// Create the tray (Windows) and show the window unless started minimized.
 /// The main window is created hidden (see `tauri.conf.json`) to avoid a flash.
+///
+/// The tray is best effort: if it cannot be created (for example no shell is
+/// running), Concord still starts, shows its window, and quits when closed.
 pub fn setup(app: &AppHandle, args: &[String]) -> tauri::Result<()> {
-    if BACKGROUND_SUPPORTED {
-        setup_tray(app)?;
+    if BACKGROUND_SUPPORTED && setup_tray(app).is_ok() {
+        TRAY_READY.store(true, Ordering::Release);
     }
-    if !(BACKGROUND_SUPPORTED && should_start_hidden(args)) {
+    if !start_hidden(args, TRAY_READY.load(Ordering::Acquire)) {
         show_main_window(app);
     }
     Ok(())
@@ -109,7 +129,7 @@ pub fn on_window_event(window: &Window, event: &WindowEvent) {
         return;
     }
     if let WindowEvent::CloseRequested { api, .. } = event {
-        if BACKGROUND_SUPPORTED {
+        if should_hide_on_close(BACKGROUND_SUPPORTED, TRAY_READY.load(Ordering::Acquire)) {
             api.prevent_close();
             let _ = window.hide();
         }
@@ -165,6 +185,18 @@ mod tests {
         // The program name (argument 0) never counts.
         assert!(!should_start_hidden(&args(&["--minimized"])));
         assert!(!should_start_hidden(&[]));
+    }
+
+    #[test]
+    fn a_missing_tray_icon_never_hides_the_window() {
+        // Without a tray icon there would be no way back to a hidden window.
+        assert!(!start_hidden(&args(&["concord.exe", START_MINIMIZED_ARG]), false));
+        assert!(start_hidden(&args(&["concord.exe", START_MINIMIZED_ARG]), true));
+        assert!(!start_hidden(&args(&["concord.exe"]), true), "no --minimized: show the window");
+        assert!(!should_hide_on_close(true, false));
+        assert!(!should_hide_on_close(false, true));
+        assert!(should_hide_on_close(true, true));
+        assert!(!should_hide_on_close(false, false));
     }
 
     #[test]

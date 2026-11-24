@@ -222,7 +222,7 @@
               <div class="bar" role="progressbar" aria-label="In progress"></div>
             {:else}
               <div class="bar det" role="progressbar" aria-label="Deleting" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(fraction * 100)}>
-                <span style="width: {fraction * 100}%"></span>
+                <span style:width="{fraction * 100}%"></span>
               </div>
             {/if}
           {/if}

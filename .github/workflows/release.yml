@@ -1,0 +1,116 @@
+# Builds the Windows installer, checks it, checksums it, attests where it came
+# from, and (for a version tag) creates a DRAFT release for a human to publish.
+#
+#   * Push a tag like v0.1.0  -> builds, then creates a draft pre-release.
+#   * Run it by hand (Actions tab -> Release -> Run workflow) -> a dry run:
+#     same build and checks, files kept as a workflow artifact for 7 days, no release.
+#
+# Actions are pinned to full commit hashes (the comment shows the version),
+# because this workflow can write releases.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows-installer:
+    name: Windows installer
+    runs-on: windows-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write          # create the draft release (tag runs only)
+      id-token: write          # sign the provenance attestation
+      attestations: write      # store the attestation
+      artifact-metadata: write # record the artifact for the attestation
+    env:
+      IS_TAG: ${{ startsWith(github.ref, 'refs/tags/v') }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: The tag must match the project version
+        if: env.IS_TAG == 'true'
+        run: node scripts/check-version.mjs "$env:TAG"
+
+      - name: The project files must agree on one version
+        if: env.IS_TAG != 'true'
+        run: node scripts/check-version.mjs
+
+      # Never ship a build whose tests fail.
+      - name: UI tests and type-check
+        run: |
+          npm test
+          npm run check
+
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test --locked
+
+      - name: Build the NSIS installer
+        run: npm run tauri build -- --bundles nsis
+
+      - name: Collect the release files and compute checksums
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          $installers = @(Get-ChildItem src-tauri/target/release/bundle/nsis -Filter '*-setup.exe')
+          if ($installers.Count -ne 1) { throw "expected exactly one installer, found $($installers.Count)" }
+          Copy-Item $installers[0].FullName dist/
+          # "<sha256> *<file>": the format `sha256sum -c` understands.
+          Get-ChildItem dist -File | Where-Object Name -ne 'SHA256SUMS.txt' | ForEach-Object {
+            '{0} *{1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
+          } | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+          Get-Content dist/SHA256SUMS.txt
+          Get-ChildItem dist | Format-Table Name, Length -AutoSize
+
+      # Installs for the current user, starts the app minimized, checks the
+      # database, checks a second launch exits, and uninstalls.
+      - name: Smoke-test the installer
+        shell: pwsh
+        run: |
+          $installer = (Get-ChildItem dist -Filter '*-setup.exe').FullName
+          pwsh scripts/smoke-test-installer.ps1 -Installer $installer
+
+      - name: Attest where these files came from
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            dist/*-setup.exe
+            dist/SHA256SUMS.txt
+
+      - name: Keep the files as a workflow artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: concord-windows
+          path: dist/*
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Create a DRAFT pre-release (tags only)
+        if: env.IS_TAG == 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $installer = (Get-ChildItem dist -Filter '*-setup.exe').Name
+          (Get-Content .github/release-notes.md -Raw).Replace('{{TAG}}', $env:TAG).Replace('{{INSTALLER}}', $installer) |
+            Set-Content -Encoding utf8 release-notes.md
+          $files = (Get-ChildItem dist -File).FullName
+          gh release create $env:TAG @files --draft --prerelease --verify-tag --title "Concord $env:TAG" --notes-file release-notes.md

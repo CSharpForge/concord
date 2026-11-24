@@ -19,18 +19,48 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self'",
+        "style-src-attr": "'unsafe-hashes' 'sha256-S8qMpvofolR8Mpjy4kQvEm7m1q8clzU4dfDH0AmvZjo='",
+        "img-src": "'self' data: https://cdn.discordapp.com",
+        "font-src": "'self'",
+        "connect-src": "'self' ipc: http://ipc.localhost",
+        "object-src": "'none'",
+        "base-uri": "'none'",
+        "form-action": "'none'",
+        "frame-ancestors": "'none'"
+      }
     }
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "nsis"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "publisher": "Concord contributors",
+    "copyright": "Copyright (c) 2026 Concord contributors",
+    "category": "Utility",
+    "shortDescription": "Bulk-delete your own Discord messages",
+    "longDescription": "Scan your own Discord messages, review the list, then delete exactly what you chose. Unofficial: not supported by Discord.",
+    "license": "MIT",
+    "licenseFile": "../LICENSE",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false,
+        "languages": [
+          "English"
+        ]
+      }
+    }
   }
 }

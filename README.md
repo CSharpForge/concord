@@ -39,7 +39,7 @@ These Windows-only behaviours (tray, hide on close, start at login) use Tauri's 
 person has not yet confirmed on Windows: the tray icon appearing, hide-on-close, start at login, and Discord
 sign-in inside WebView2.
 
-Planned: data-package import, archive before delete, scheduled cleanups, a Windows installer and release builds.
+Planned: data-package import, archive before delete, scheduled cleanups.
 
 ## Safety rules the engine follows
 
@@ -55,6 +55,14 @@ Planned: data-package import, archive before delete, scheduled cleanups, a Windo
   your computer. The previews are erased when the deletion finishes or you remove the scan. Your token is
   never stored there.
 
+## Download
+
+There is no release yet. When there is one it will be an installer on the
+[Releases page](https://github.com/CSharpForge/concord/releases), for your user only (no administrator
+rights). It will be **unsigned** at first, so Windows will warn about an unknown publisher; every release comes
+with a checksum and a signed provenance attestation, explained in
+[docs/VERIFY-DOWNLOAD.md](docs/VERIFY-DOWNLOAD.md). You can also build it yourself (below).
+
 ## Security and trust
 
 - **Where your token goes:** [docs/TOKEN-HANDLING.md](docs/TOKEN-HANDLING.md). It is stored only in Windows
@@ -62,6 +70,7 @@ Planned: data-package import, archive before delete, scheduled cleanups, a Windo
   and no logging. Tests fail the build if any of that stops being true.
 - **Known limitations** (for example: the token is not wiped from memory, no installer or code signing yet) are
   listed there too.
+- **Verifying a download:** [docs/VERIFY-DOWNLOAD.md](docs/VERIFY-DOWNLOAD.md).
 - **Reporting a vulnerability:** see [SECURITY.md](SECURITY.md).
 
 ## Testing against real Discord

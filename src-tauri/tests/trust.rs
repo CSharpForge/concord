@@ -133,3 +133,42 @@ fn no_command_deals_in_tokens() {
     }
     assert_eq!(checked, names.len(), "every registered command was checked");
 }
+
+#[test]
+fn the_content_security_policy_is_strict() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tauri.conf.json");
+    let conf: serde_json::Value = serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
+    let csp = conf["app"]["security"]["csp"].as_object().expect("a CSP must be set (it is null/absent)");
+    let get = |k: &str| csp.get(k).and_then(|v| v.as_str()).unwrap_or_else(|| panic!("CSP is missing {k}"));
+
+    // Scripts and styles: this app's own files only. Tauri adds hashes/nonces for its bundled code.
+    assert_eq!(get("script-src"), "'self'");
+    assert_eq!(get("style-src"), "'self'");
+    assert_eq!(get("default-src"), "'self'");
+    // Locked down: no plugins, no <base>, no forms, never framed.
+    assert_eq!(get("object-src"), "'none'");
+    assert_eq!(get("base-uri"), "'none'");
+    assert_eq!(get("form-action"), "'none'");
+    assert_eq!(get("frame-ancestors"), "'none'");
+    // Images: Discord's CDN for server icons, nothing else remote.
+    let img: Vec<&str> = get("img-src").split_whitespace().collect();
+    assert_eq!(img, ["'self'", "data:", "https://cdn.discordapp.com"]);
+    // The page may only talk to Tauri's own IPC; no web hosts at all.
+    let connect: Vec<&str> = get("connect-src").split_whitespace().collect();
+    assert_eq!(connect, ["'self'", "ipc:", "http://ipc.localhost"]);
+
+    // SvelteKit's hidden screen-reader announcer ships one inline style attribute. It is allowed
+    // by hash only (never 'unsafe-inline'); the UI test checks the hash matches SvelteKit's output.
+    let attr: Vec<&str> = get("style-src-attr").split_whitespace().collect();
+    assert_eq!(attr.len(), 2, "style-src-attr must be exactly 'unsafe-hashes' plus one hash");
+    assert_eq!(attr[0], "'unsafe-hashes'");
+    assert!(attr[1].starts_with("'sha256-") && attr[1].ends_with("='"), "style-src-attr hash looks wrong: {}", attr[1]);
+
+    // Nothing may weaken it.
+    for (k, v) in csp {
+        let v = v.as_str().unwrap();
+        for bad in ["'unsafe-inline'", "'unsafe-eval'", "'wasm-unsafe-eval'", "*", "blob:", "http:", "https:", "ws:", "wss:"] {
+            assert!(!v.split_whitespace().any(|t| t == bad), "{k} contains {bad}");
+        }
+    }
+}

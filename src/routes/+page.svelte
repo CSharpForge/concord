@@ -133,6 +133,10 @@
     --warn: #f0b429;
     --danger: #ff6b6b;
   }
+  :global(#app-root) {
+    /* The wrapper added by app.html. A class + rule instead of an inline style, which the CSP forbids. */
+    display: contents;
+  }
   :global(body) {
     margin: 0;
     background: var(--bg);
