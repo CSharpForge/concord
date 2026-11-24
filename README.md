@@ -1,5 +1,7 @@
 # Concord
 
+[![CI](https://github.com/CSharpForge/concord/actions/workflows/ci.yml/badge.svg)](https://github.com/CSharpForge/concord/actions/workflows/ci.yml)
+
 A desktop app to bulk-delete **your own** Discord messages — a safer, more reliable take on [Undiscord](https://github.com/victornpb/undiscord).
 
 > ## ⚠️ Not supported by Discord
@@ -31,8 +33,11 @@ What works today:
   jobs keep running, only one copy runs at a time, and an opt-in "start when I sign in to Windows" switch that
   opens Concord minimized. Jobs that were running stay paused after a restart until you resume them.
 
-These Windows-only behaviours (tray, hide on close, start at login) are written against Tauri's official tray
-API and its `autostart` / `single-instance` plugins, but have not yet been run on Windows.
+These Windows-only behaviours (tray, hide on close, start at login) use Tauri's official tray API and its
+`autostart` / `single-instance` plugins. GitHub Actions builds and tests Concord on Windows for every push
+(Rust and UI tests, plus a real Windows Credential Manager check). What no automated test covers yet, and a
+person has not yet confirmed on Windows: the tray icon appearing, hide-on-close, start at login, and Discord
+sign-in inside WebView2.
 
 Planned: data-package import, archive before delete, scheduled cleanups, a Windows installer and release builds.
 
