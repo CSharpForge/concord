@@ -94,6 +94,32 @@ pub async fn worker_loop(engine: Engine, queue: Arc<Notify>) {
     }
 }
 
+/// Pause every queued or running job. Returns the jobs that were paused.
+pub async fn pause_all_jobs(store: &Store) -> Result<Vec<Job>, sqlx::Error> {
+    let mut paused = Vec::new();
+    for j in store.list().await? {
+        if matches!(j.status(), Some(JobStatus::Queued | JobStatus::Running))
+            && store.transition(j.id, &[JobStatus::Queued, JobStatus::Running], JobStatus::Paused, None).await?
+        {
+            if let Some(updated) = store.get(j.id).await? {
+                paused.push(updated);
+            }
+        }
+    }
+    Ok(paused)
+}
+
+/// The tray's "Pause all jobs".
+pub async fn pause_all(app: AppHandle) {
+    let Some(jobs) = app.try_state::<JobsState>() else { return };
+    if let Ok(paused) = pause_all_jobs(&jobs.store).await {
+        for j in &paused {
+            emit(&app, j);
+        }
+        jobs.control.notify_one(); // wake a running job's waits so it stops promptly
+    }
+}
+
 // ------------------------------------------------------------ job planning
 
 #[derive(Debug, Clone, Deserialize)]
@@ -487,6 +513,30 @@ mod tests {
         store.add_candidates(j.id, &[cand("10"), cand("11")]).await.unwrap();
         store.transition(j.id, &[JobStatus::Queued], JobStatus::Completed, None).await.unwrap();
         j.id
+    }
+
+    // ---- pause all (tray)
+
+    #[tokio::test]
+    async fn pause_all_pauses_only_queued_and_running_jobs() {
+        let s = Store::in_memory().await.unwrap();
+        let running = s.create(nj(JobKind::Scan, "1", None)).await.unwrap();
+        s.claim_next().await.unwrap(); // -> running
+        let queued = s.create(nj(JobKind::Scan, "2", None)).await.unwrap();
+        let paused = s.create(nj(JobKind::Scan, "3", None)).await.unwrap();
+        s.transition(paused.id, &[JobStatus::Queued], JobStatus::Paused, Some("by user")).await.unwrap();
+        let done = s.create(nj(JobKind::Scan, "4", None)).await.unwrap();
+        s.transition(done.id, &[JobStatus::Queued], JobStatus::Completed, None).await.unwrap();
+
+        let changed = pause_all_jobs(&s).await.unwrap();
+        let mut ids: Vec<i64> = changed.iter().map(|j| j.id).collect();
+        ids.sort();
+        assert_eq!(ids, vec![running.id, queued.id]);
+        assert!(changed.iter().all(|j| j.status() == Some(JobStatus::Paused)));
+        assert_eq!(s.status(running.id).await.unwrap(), Some(JobStatus::Paused));
+        assert_eq!(s.status(done.id).await.unwrap(), Some(JobStatus::Completed), "finished jobs untouched");
+        assert_eq!(s.get(paused.id).await.unwrap().unwrap().error.as_deref(), Some("by user"), "already-paused job left alone");
+        assert!(pause_all_jobs(&s).await.unwrap().is_empty(), "idempotent");
     }
 
     // ---- planning scans

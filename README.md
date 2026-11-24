@@ -8,9 +8,10 @@ A desktop app to bulk-delete **your own** Discord messages — a safer, more rel
 > account limited or permanently terminated. There is no official bulk-delete for users.
 > Use Concord at your own risk, ideally on an account you can afford to lose.
 >
-> Your login token is a full key to your account. Concord stores it only in your OS keychain
-> (Secret Service on Linux, Credential Manager on Windows). It is never logged, never stored in the
-> database, and never sent to the web UI.
+> Your login token is a full key to your account. Concord stores it only in Windows Credential
+> Manager. It is never logged, never stored in the database, and never sent to the web UI.
+
+**Platform: Windows 10/11 only.** Linux and macOS are not supported.
 
 ## Status
 
@@ -20,14 +21,20 @@ UI tests and a mocked-backend UI run). Expect surprises, and try it on a throwaw
 
 What works today:
 
-- Embedded Discord sign-in (QR code or password); the token goes to your OS keychain.
+- Embedded Discord sign-in (QR code or password); the token goes to Windows Credential Manager.
 - Browse servers, channels and DMs; pick what to clean.
 - **Scan, review, delete:** a scan finds your own messages (optionally filtered by date range, words,
   attachments or links); you review the list and untick anything to keep; a delete removes exactly that list.
 - **Protect-list:** servers or channels Concord will never scan or delete from.
 - Rate-limit-aware requests, pause/resume/cancel, and recovery after a crash or quit.
+- **Runs in the background:** a tray icon (open, pause all jobs, quit), closing the window hides it to the tray so
+  jobs keep running, only one copy runs at a time, and an opt-in "start when I sign in to Windows" switch that
+  opens Concord minimized. Jobs that were running stay paused after a restart until you resume them.
 
-Planned: data-package import, archive before delete, tray icon with start-at-login, scheduled cleanups.
+These Windows-only behaviours (tray, hide on close, start at login) are written against Tauri's official tray
+API and its `autostart` / `single-instance` plugins, but have not yet been run on Windows.
+
+Planned: data-package import, archive before delete, scheduled cleanups, a Windows installer and release builds.
 
 ## Safety rules the engine follows
 
@@ -57,23 +64,26 @@ CONCORD_TEST_TOKEN=<test account token> CONCORD_TEST_CHANNEL=<channel id> \
 
 Tauri 2 (Rust) · Svelte 5 + TypeScript · SQLite (`tauri-plugin-sql`) · `reqwest` (rustls) · `keyring`
 
-## Develop
+## Develop (Windows)
 
-Linux prerequisites (from [tauri.app](https://v2.tauri.app/start/prerequisites/)):
+Prerequisites, from the official [Tauri guide](https://v2.tauri.app/start/prerequisites/#windows):
 
-```bash
-sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
-```
+1. **Microsoft C++ Build Tools**, with the "Desktop development with C++" workload.
+2. **WebView2**, already present on Windows 10 (1803+) and 11.
+3. **Rust** via [rustup](https://rustup.rs), with the **MSVC** toolchain (`rustup default stable-msvc`).
+4. **Node.js**.
 
-Install Rust with [rustup](https://rustup.rs), then:
+Then:
 
 ```bash
 npm install
 npm run tauri dev      # run the app
 npm test               # UI tests (Vitest)
-cd src-tauri && cargo test                              # Rust tests
-cd src-tauri && cargo test -- --ignored keyring_roundtrip  # real-keychain test
+cd src-tauri && cargo test                                 # Rust tests
+cd src-tauri && cargo test -- --ignored keyring_roundtrip  # real Credential Manager test
 ```
+
+The tests are plain Rust and TypeScript and should pass anywhere, but only Windows is a supported target.
 
 ## How sign-in works
 

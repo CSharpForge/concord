@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { getStatus, logout, onAuthChanged, onLoginFailed, startLogin } from "$lib/auth";
+  import Background from "$lib/Background.svelte";
   import Browse from "$lib/Browse.svelte";
   import Jobs from "$lib/Jobs.svelte";
   import { displayName, initial, type CurrentUser } from "$lib/user";
@@ -88,6 +89,7 @@
       <button class="secondary" onclick={signOut}>Sign out</button>
     </section>
     {#if error}<p class="error" role="alert">{error}</p>{/if}
+    <Background />
     <Browse />
     <Jobs />
   {:else}

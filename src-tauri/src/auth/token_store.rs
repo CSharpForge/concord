@@ -26,7 +26,7 @@ pub trait TokenStore: Send + Sync {
     fn delete(&self) -> Result<(), StoreError>;
 }
 
-/// OS keychain: Secret Service on Linux, Credential Manager on Windows.
+/// Windows Credential Manager (via the `keyring` crate). Concord supports Windows only.
 pub struct KeyringStore {
     service: String,
     account: String,
@@ -103,8 +103,8 @@ mod tests {
         assert_eq!(s.load().unwrap(), None);
     }
 
-    /// Talks to the real OS keychain, so it needs a running Secret Service
-    /// (Linux) / Credential Manager (Windows). Uses a throwaway entry name.
+    /// Talks to the real OS credential store (Windows Credential Manager; on a
+    /// development machine, whatever the OS provides). Uses a throwaway entry name.
     /// Run with: cargo test -- --ignored keyring_roundtrip
     #[test]
     #[ignore = "needs a real OS keychain"]
