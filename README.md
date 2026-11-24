@@ -55,6 +55,15 @@ Planned: data-package import, archive before delete, scheduled cleanups, a Windo
   your computer. The previews are erased when the deletion finishes or you remove the scan. Your token is
   never stored there.
 
+## Security and trust
+
+- **Where your token goes:** [docs/TOKEN-HANDLING.md](docs/TOKEN-HANDLING.md). It is stored only in Windows
+  Credential Manager, sent only to `discord.com`, and never given to the app's window. There is no telemetry
+  and no logging. Tests fail the build if any of that stops being true.
+- **Known limitations** (for example: the token is not wiped from memory, no installer or code signing yet) are
+  listed there too.
+- **Reporting a vulnerability:** see [SECURITY.md](SECURITY.md).
+
 ## Testing against real Discord
 
 Use a **throwaway account** and a private test server, never your main account:
