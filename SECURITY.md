@@ -15,10 +15,6 @@ Concord is **pre-release**. Only the latest commit on `main` is supported; there
 Use GitHub's private reporting: on the repository's **Security** tab choose **Report a vulnerability**
 (or go to <https://github.com/CSharpForge/concord/security/advisories/new>).
 
-If you do not see that button, private reporting has not been switched on yet. Open a public issue that says
-only that you have a security report, with **no technical details**, and the maintainer will arrange a private
-channel.
-
 Please include what you found, the steps to reproduce it (using a throwaway account, see below), the version or
 commit, and what you think the impact is.
 
