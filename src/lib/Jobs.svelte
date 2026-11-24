@@ -26,7 +26,7 @@
     type Job,
     type Speed,
   } from "./jobs";
-  import { jobsStore } from "./jobs.svelte";
+  import { jobsStore } from "./jobsStore.svelte";
   import Preview from "./Preview.svelte";
   import { selection } from "./selection.svelte";
 

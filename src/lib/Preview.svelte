@@ -10,7 +10,7 @@
     type Candidate,
     type Job,
   } from "./jobs";
-  import { jobsStore } from "./jobs.svelte";
+  import { jobsStore } from "./jobsStore.svelte";
 
   let { scan, onclose }: { scan: Job; onclose: () => void } = $props();
 
